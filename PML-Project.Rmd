@@ -1,0 +1,120 @@
+---
+title: "JHU PML Project"
+author: "Araf"
+date: "8/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Context
+
+The goal of the project is to predict the manner in which people did the exercise. This is the "classe" variable in the training set. We need to create a model to predict the manner in which the subjects did the exercise using the accelerometer data as predictors.
+
+## Library Loading
+
+```{r, echo=TRUE}
+library(caret)
+library(randomForest)
+```
+
+## Download & Load Data
+
+Let's download & load the datasets.
+
+```{r, echo=TRUE}
+
+# setting paths
+trainnet <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testnet <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+#  loading datasets
+train <- read.csv(file = "train.csv", header = TRUE, sep = ",", na.strings = c("NA", "#DIV/0!", ""))
+test <- read.csv(file = "test.csv", header = TRUE, sep = ",", na.strings = c("NA", "#DIV/0!", ""))
+
+```
+
+## Data Preparation
+
+Lets begin with examining the dataset:
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+library(caret)
+dim(train)
+dim(test)
+str(train)
+```
+
+Let's examine the low variance variables and take them out.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+fixedtrain <- nearZeroVar(train, saveMetrics = TRUE)
+train1 <- train[, fixedtrain$nzv == FALSE]
+str(train1)
+```
+
+Now let's remove columns with too many missing values and get rid of unnecessary variables.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+# set removal threshold at 80% or greater
+naCount <-sapply(train1, function(y) sum(length(which(is.na(y)))))
+threshold <- .8
+naList <- naCount[naCount >= threshold * dim(train1[1])]
+namesNA <- names(train1) %in% names(naList)
+train2 <- train1[!namesNA]
+train3 <- train2[, -c(1:5)]
+```
+
+## Train & Test Set
+
+Let's divide the dataset.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+
+#  split data into training and test sets
+inTrain = createDataPartition(train3[[1]], p = 0.6, list = FALSE)
+training = train3[ inTrain,]
+testing = train3[-inTrain,]
+```
+
+## Model Development
+
+We will be using Random Forest to build our prediction model.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+set.seed(457)
+modelFit <- train( classe ~ .,
+                   data = training,
+                   nodesize=10,
+                   allowParallel=TRUE, do.trace=FALSE,
+                   trControl = trainControl(method ='oob'),
+                   method="rf")
+print(modelFit)
+```
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+ggplot(modelFit$result, aes(x = mtry, y = Accuracy)) +
+        geom_point() +
+        geom_line() +
+        ggtitle('Accuracy VS mtry')
+```
+
+#  make predictions
+
+Let's make predictions!
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+prediction <- predict(modelFit, testing)
+```
+
+## Accuracy Test
+
+Let's build a confusion matrix and understand how we did.
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+confusionMatrix(factor(prediction), factor(testing$classe))
+```
+
+Thank you for taking a look at this!
